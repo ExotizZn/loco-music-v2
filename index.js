@@ -1,5 +1,4 @@
 const { Client, Intents, Collection } = require('discord.js');
-const { token } = require('./config');
 const { readdirSync } = require('fs')
 
 const client = new Client({
