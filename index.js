@@ -39,7 +39,7 @@ for (const file of commands) {
 client.once('ready', ()=>{
     console.log(`Connecté en tant que ${client.user.username}\n-> Disponibe sur ${client.guilds.cache.size} serveurs pour un total de ${client.users.cache.size} utilisateurs`);
 
-    client.user.setActivity('!help');
+    client.user.setActivity('V2');
 })
 
 client.login(process.env.TOKEN)
