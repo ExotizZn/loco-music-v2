@@ -17,5 +17,8 @@
     "libsodium-wrappers": "^0.7.9",
     "ytdl-core": "^4.9.1",
     "ytsr": "^3.5.3"
-  }
+  },
+  "engines":{
+      "node":"8.7.0"
+   }
 }
