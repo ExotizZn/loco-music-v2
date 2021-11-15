@@ -1,45 +1,157 @@
-const { Client, Intents, Collection } = require('discord.js');
-const { readdirSync } = require('fs')
+const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require( '@discordjs/voice' );
+const { MessageEmbed } = require("discord.js");
+const ytsr = require( 'ytsr' );
+const ytdl = require( 'ytdl-core' )
 
-const client = new Client({
-    intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MEMBERS,
-        Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_VOICE_STATES
-    ],
-    disableMentions: 'everyone',
-});
+module.exports = {
+    name: 'play',
+    aliases: ['p'],
+    voiceChannel: true,
 
-client.commands = new Collection();
-client.queue = new Map();
+    async execute( client , message , args ) {
 
-const events = readdirSync('./events/').filter(file => file.endsWith('.js'));
+        const channel = message.member.voice.channel;
 
-console.log(`Chargement des évenement ⌛`);
+        const error = (err) => message.channel.send(err);
+        const send = (content) => message.channel.send(content);
+        const setqueue = (id, obj) => message.client.queue.set(id, obj)
+        const queue = message.client.queue.get(message.guild.id);
 
-for (const file of events) {
-    const event = require(`./events/${file}`);
-    console.log(`🟢 ${file.split('.')[0]}`);
-    client.on(file.split('.')[0], event.bind(null, client));
-    delete require.cache[require.resolve(`./events/${file}`)];
-};
+        if (!channel){
+            const embed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle("🔴 Vous n'êtes pas connecté à un salon vocal 🔴")
 
-console.log(`Chargement des commandes ⌛`);
+            return error({embeds:[embed]})
+        }
 
-const commands = readdirSync(`./commands/`).filter(files => files.endsWith('.js'));
+        const query = args.join(" ");
 
-for (const file of commands) {
-    const command = require(`./commands/${file}`);
-    console.log(`🟢 ${command.name.toLowerCase()}`);
-    client.commands.set(command.name.toLowerCase(), command);
-    delete require.cache[require.resolve(`./commands/${file}`)];
-};
+        if (!query & !queue ){
+            const embed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle("🔴 Veuillez indiquer le titre de la musique 🔴")
 
-client.once('ready', ()=>{
-    console.log(`Connecté en tant que ${client.user.username}\n-> Disponibe sur ${client.guilds.cache.size} serveurs pour un total de ${client.users.cache.size} utilisateurs`);
+            return error({embeds:[embed]})
+        } 
 
-    client.user.setActivity('V2');
-})
+        const searchResults = await ytsr(query,{ pages: 1 });
 
-client.login(process.env.TOKEN)
+        const song = {
+            title: searchResults['items'][0]['title'],
+            thumbnail : searchResults['items'][0]['bestThumbnail'],
+            url : searchResults['items'][0]['url'],
+            id : searchResults['items'][0]['id'],
+            views : searchResults['items'][0]['views'],
+            duration : searchResults['items'][0]['duration'],
+            author : searchResults['items'][0]['author'],
+        }
+
+        if(!queue){
+            const structure = {
+                channel: message.channel,
+                vc: channel,
+                volume: 85,
+                player : null,
+                playing: true,
+                queue: [],
+                connection: null,
+            };
+            
+            setqueue(message.guild.id, structure);
+            structure.queue.push(song);
+            const track = message.client.queue.get(message.guild.id);
+            play(track.queue[0])
+
+            const embed = new MessageEmbed()
+                .setColor('GREEN')
+                .setTitle(':cd: Lecture en cours...')
+                .setImage(song['thumbnail']['url'])
+                .addFields(
+                    { name: ':notes: Titre', value: song['title'] },
+                    { name: ':alarm_clock: Durée', value: song['duration'] },
+                    { name: ':eye: Nombre de vues', value: song['views'].toString()},
+                    { name: ':pencil: Auteur', value: song['author']['name']},   
+                )
+
+            return send({embeds: [embed]})
+        } 
+        
+        if(queue){
+            if (queue.queue.length >= 1){
+                queue.queue.push(song)
+    
+                const embed = new MessageEmbed()
+                    .setColor('ORANGE')
+                    .setTitle(":hourglass_flowing_sand: Dans la file d'attente")
+                    .setImage(song['thumbnail']['url'])
+                    .addFields(
+                        { name: ':notes: Titre', value: song['title'] },
+                        { name: ':alarm_clock: Durée', value: song['duration'] },
+                        { name: ':eye: Nombre de vues', value: song['views'].toString()},
+                        { name: ':pencil: Auteur', value: song['author']['name']},   
+                    )
+             
+                return send({embeds: [embed]})
+            } else if (queue.queue.length == 0){
+                queue.queue.push(song)
+                const track = message.client.queue.get(message.guild.id);
+
+                const embed = new MessageEmbed()
+                .setColor('GREEN')
+                .setTitle(':cd: Lecture en cours...')
+                .setImage(song['thumbnail']['url'])
+                .addFields(
+                    { name: ':notes: Titre', value: song['title'] },
+                    { name: ':alarm_clock: Durée', value: song['duration'] },
+                    { name: ':eye: Nombre de vues', value: song['views'].toString()},
+                    { name: ':pencil: Auteur', value: song['author']['name']},   
+                )
+
+                play(track.queue[0])
+                return send({embeds: [embed]})
+            } else if (queue.queue.length >= 1 & !queue.playing & !args){
+                queue.player.unpause()
+                queue.playing = true
+            }
+        } 
+
+        function play(track){
+            const data =  message.client.queue.get(message.guild.id);
+            const source = ytdl(track.url,{
+                filter: "audioonly",
+                quality: "highestaudio",
+                highWaterMark: 1 << 25,
+            })
+
+            const resource = createAudioResource(source,{ inlineVolume:true })
+            resource.volume.setVolume(1)
+            const player = createAudioPlayer()
+
+            const connection = joinVoiceChannel({
+                channelId: channel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator,
+            });
+
+            data.player = player
+            data.connection = connection
+            connection.subscribe(player);
+            player.play(resource);
+
+            player.on('idle',()=>{
+                data.queue.shift()
+                const list = message.client.queue.get(message.guild.id);
+
+                if (list.queue.length == 0){
+                    setTimeout(()=>{
+                        player.stop()
+                        connection.destroy()   
+                    },30000) 
+                } else {
+                    play(list.queue[0])
+                }
+            })
+        } 
+    }
+}
