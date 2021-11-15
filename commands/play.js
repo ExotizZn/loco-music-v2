@@ -17,11 +17,23 @@ module.exports = {
         const setqueue = (id, obj) => message.client.queue.set(id, obj)
         const queue = message.client.queue.get(message.guild.id);
 
-        if (!channel) return error("Vous n'êtes pas connecté à un salon vocal :x:")
+        if (!channel){
+            const embed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle("🔴 Vous n'êtes pas connecté à un salon vocal 🔴")
+
+            return error({embeds:[embed]})
+        }
 
         const query = args.join(" ");
 
-        if (!query) return error("Veuillez indiquer le nom d'une musique :x:")
+        if (!query & !queue ){
+            const embed = new MessageEmbed()
+                .setColor('RED')
+                .setTitle("🔴 Veuillez indiquer le titre de la musique 🔴")
+
+            return error({embeds:[embed]})
+        } 
 
         const searchResults = await ytsr(query,{ pages: 1 });
 
@@ -54,7 +66,7 @@ module.exports = {
             const embed = new MessageEmbed()
                 .setColor('GREEN')
                 .setTitle(':cd: Lecture en cours...')
-                .setThumbnail(song['thumbnail']['url'])
+                .setImage(song['thumbnail']['url'])
                 .addFields(
                     { name: ':notes: Titre', value: song['title'] },
                     { name: ':alarm_clock: Durée', value: song['duration'] },
@@ -63,7 +75,6 @@ module.exports = {
                 )
 
             return send({embeds: [embed]})
-
         } 
         
         if(queue){
@@ -73,14 +84,14 @@ module.exports = {
                 const embed = new MessageEmbed()
                     .setColor('ORANGE')
                     .setTitle(":hourglass_flowing_sand: Dans la file d'attente")
-                    .setThumbnail(song['thumbnail']['url'])
+                    .setImage(song['thumbnail']['url'])
                     .addFields(
                         { name: ':notes: Titre', value: song['title'] },
                         { name: ':alarm_clock: Durée', value: song['duration'] },
                         { name: ':eye: Nombre de vues', value: song['views'].toString()},
                         { name: ':pencil: Auteur', value: song['author']['name']},   
                     )
-                
+             
                 return send({embeds: [embed]})
             } else if (queue.queue.length == 0){
                 queue.queue.push(song)
@@ -89,7 +100,7 @@ module.exports = {
                 const embed = new MessageEmbed()
                 .setColor('GREEN')
                 .setTitle(':cd: Lecture en cours...')
-                .setThumbnail(song['thumbnail']['url'])
+                .setImage(song['thumbnail']['url'])
                 .addFields(
                     { name: ':notes: Titre', value: song['title'] },
                     { name: ':alarm_clock: Durée', value: song['duration'] },
@@ -99,9 +110,11 @@ module.exports = {
 
                 play(track.queue[0])
                 return send({embeds: [embed]})
+            } else if (queue.queue.length >= 1 & !queue.playing & !args){
+                queue.player.unpause()
+                queue.playing = true
             }
         } 
-
 
         function play(track){
             const data =  message.client.queue.get(message.guild.id);
@@ -111,36 +124,34 @@ module.exports = {
                 highWaterMark: 1 << 25,
             })
 
-            if(data.queue.length == 1){
-                const resource = createAudioResource(source,{ inlineVolume:true })
-                resource.volume.setVolume(1)
-                const player = createAudioPlayer()
+            const resource = createAudioResource(source,{ inlineVolume:true })
+            resource.volume.setVolume(1)
+            const player = createAudioPlayer()
 
-                const connection = joinVoiceChannel({
-                    channelId: channel.id,
-                    guildId: message.guild.id,
-                    adapterCreator: message.guild.voiceAdapterCreator,
-                });
+            const connection = joinVoiceChannel({
+                channelId: channel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator,
+            });
 
-                data.player = player
-                data.connection = connection
-                connection.subscribe(player);
-                player.play(resource);
+            data.player = player
+            data.connection = connection
+            connection.subscribe(player);
+            player.play(resource);
 
-                player.on('idle',()=>{
-                    data.queue.shift()
-                    const a = message.client.queue.get(message.guild.id);
+            player.on('idle',()=>{
+                data.queue.shift()
+                const list = message.client.queue.get(message.guild.id);
 
-                    if (a.queue.length == 0){
-                        setTimeout(()=>{
-                            player.stop()
-                            connection.destroy()   
-                        },30000) 
-                    } else {
-                        play(a.queue[0])
-                    }
-                })
-            } 
-        }
+                if (list.queue.length == 0){
+                    setTimeout(()=>{
+                        player.stop()
+                        connection.destroy()   
+                    },30000) 
+                } else {
+                    play(list.queue[0])
+                }
+            })
+        } 
     }
 }
