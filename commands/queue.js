@@ -4,7 +4,7 @@ module.exports = {
     name: 'queue',
     voiceChannel: true,
 
-    async execute( client, message ) {
+    async execute( client, message, args ) {
         const queue = message.client.queue.get(message.guild.id);
 
         const error = (err) => message.channel.send(err);
@@ -33,7 +33,17 @@ module.exports = {
             return list
         }
 
-        if(queue){
+        if(args == 'clear'){
+            queue.queue = []
+
+            const embed = new MessageEmbed()
+                .setColor('GREEN')
+                .setTitle("🟢 File d'attente effacée avec succès 🟢")
+
+            return send({embeds:[embed]})
+        }
+
+        if(queue || (!args)){
             if(queue.queue.length == 0){
                 const embed = new MessageEmbed()
                 .setColor('ORANGE')
