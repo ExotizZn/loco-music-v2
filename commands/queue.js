@@ -34,7 +34,7 @@ module.exports = {
         }
 
         if(args == 'clear'){
-            queue.queue = []
+            queue.queue.splice(1)
 
             const embed = new MessageEmbed()
                 .setColor('GREEN')
@@ -53,7 +53,7 @@ module.exports = {
             } else if (queue.queue.length > 0){
                 const embed = new MessageEmbed()
                     .setColor("ORANGE")
-                    .setTitle("File d'attente")
+                    .setTitle(":scroll: File d'attente")
                     .setDescription(`${embedCreator(queue)}`)
 
                 return send({embeds:[embed]})
