@@ -1,4 +1,4 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require( '@discordjs/voice' );
+const { createAudioResource } = require( '@discordjs/voice' );
 const { MessageEmbed } = require('discord.js');
 const ytdl = require( 'ytdl-core' );
 
@@ -37,7 +37,7 @@ module.exports = {
                 const embed = new MessageEmbed()
                     .setColor('GREEN')
                     .setTitle(':cd: Lecture en cours...')
-                    .setImage(track.queue[0]['thumbnail']['url'])
+                    .setImage(track.queue[0]['thumbnail'])
                     .addFields(
                         { name: ':notes: Titre', value: track.queue[0]['title'] },
                         { name: ':alarm_clock: Durée', value:  track.queue[0]['duration'] },
