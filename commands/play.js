@@ -1,6 +1,6 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require( '@discordjs/voice' );
 const { MessageEmbed } = require("discord.js");
-const ytsr = require( 'ytsr' );
+const ytsearch = require( 'yt-search' );
 const ytdl = require( 'ytdl-core' )
 
 module.exports = {
@@ -35,16 +35,17 @@ module.exports = {
             return error({embeds:[embed]})
         } 
 
-        const searchResults = await ytsr(query,{ pages: 1 });
+        const searchResults = await ytsearch(query);
+        const result = searchResults.videos
 
         const song = {
-            title: searchResults['items'][0]['title'],
-            thumbnail : searchResults['items'][0]['bestThumbnail'],
-            url : searchResults['items'][0]['url'],
-            id : searchResults['items'][0]['id'],
-            views : searchResults['items'][0]['views'],
-            duration : searchResults['items'][0]['duration'],
-            author : searchResults['items'][0]['author'],
+            title: result[0]['title'],
+            thumbnail : result[0]['thumbnail'],
+            url : result[0]['url'],
+            id : result[0]['videoId'],
+            views : result[0]['views'],
+            duration : result[0]['timestamp'],
+            author : result[0]['author']
         }
 
         if(!queue){
@@ -66,7 +67,7 @@ module.exports = {
             const embed = new MessageEmbed()
                 .setColor('GREEN')
                 .setTitle(':cd: Lecture en cours...')
-                .setImage(song['thumbnail']['url'])
+                .setImage(result[0]['thumbnail'])
                 .addFields(
                     { name: ':notes: Titre', value: song['title'] },
                     { name: ':alarm_clock: Durée', value: song['duration'] },
@@ -84,7 +85,7 @@ module.exports = {
                 const embed = new MessageEmbed()
                     .setColor('ORANGE')
                     .setTitle(":hourglass_flowing_sand: Dans la file d'attente")
-                    .setImage(song['thumbnail']['url'])
+                    .setImage(result[0]['thumbnail'])
                     .addFields(
                         { name: ':notes: Titre', value: song['title'] },
                         { name: ':alarm_clock: Durée', value: song['duration'] },
@@ -100,7 +101,7 @@ module.exports = {
                 const embed = new MessageEmbed()
                 .setColor('GREEN')
                 .setTitle(':cd: Lecture en cours...')
-                .setImage(song['thumbnail']['url'])
+                .setImage(result[0]['thumbnail'])
                 .addFields(
                     { name: ':notes: Titre', value: song['title'] },
                     { name: ':alarm_clock: Durée', value: song['duration'] },
