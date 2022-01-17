@@ -1,133 +1,113 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require( '@discordjs/voice' );
-const { MessageEmbed } = require("discord.js");
-const ytsearch = require( 'yt-search' );
-const ytdl = require( 'ytdl-core' )
+const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require( "@discordjs/voice" );
+const { MessageEmbed } = require( "discord.js" );
+const ytsearch = require( "yt-search" );
+const ytdl = require( "ytdl-core" );
 
 module.exports = {
-    name: 'play',
-    aliases: ['p'],
+    name: "play",
+    aliases: ["p"],
     voiceChannel: true,
 
-    async execute( client , message , args ) {
+    async execute( client, message, args ){
 
         const channel = message.member.voice.channel;
-
-        const error = (err) => message.channel.send(err);
-        const send = (content) => message.channel.send(content);
-        const setqueue = (id, obj) => message.client.queue.set(id, obj)
+        const setqueue = (id, obj) => message.client.queue.set(id, obj);
         const queue = message.client.queue.get(message.guild.id);
-
-        if (!channel){
-            const embed = new MessageEmbed()
-                .setColor('RED')
-                .setTitle("🔴 Vous n'êtes pas connecté à un salon vocal 🔴")
-
-            return error({embeds:[embed]})
-        }
-
         const query = args.join(" ");
+        const send = (content) => message.channel.send(content);
 
-        if (!query & !queue ){
+        if ((!channel & !query) || (!channel & Boolean(query))){
             const embed = new MessageEmbed()
-                .setColor('RED')
-                .setTitle("🔴 Veuillez indiquer le titre de la musique 🔴")
+                .setColor("RED")
+                .setTitle("Erreur")
+                .setDescription("Tu n'es pas connecté à un salon vocal")
 
-            return error({embeds:[embed]})
-        } 
-
-        const searchResults = await ytsearch(query);
-        const result = searchResults.videos
-
-        const song = {
-            title: result[0]['title'],
-            thumbnail : result[0]['thumbnail'],
-            url : result[0]['url'],
-            id : result[0]['videoId'],
-            views : result[0]['views'],
-            duration : result[0]['timestamp'],
-            author : result[0]['author']
+            return send({embeds:[embed]})
         }
 
-        if(!queue){
-            const structure = {
-                channel: message.channel,
-                vc: channel,
-                volume: 85,
-                player : null,
-                playing: true,
-                queue: [],
-                connection: null,
-            };
-            
-            setqueue(message.guild.id, structure);
-            structure.queue.push(song);
-            const track = message.client.queue.get(message.guild.id);
-            play(track.queue[0])
-
+        if (!query & Boolean(channel)){
             const embed = new MessageEmbed()
-                .setColor('GREEN')
-                .setTitle(':cd: Lecture en cours...')
-                .setImage(result[0]['thumbnail'])
-                .addFields(
-                    { name: ':notes: Titre', value: song['title'] },
-                    { name: ':alarm_clock: Durée', value: song['duration'] },
-                    { name: ':eye: Nombre de vues', value: song['views'].toString()},
-                    { name: ':pencil: Auteur', value: song['author']['name']},   
-                )
+                .setColor("RED")
+                .setTitle("Erreur")
+                .setDescription("Tu dois indiquer le nom de la musique")
 
-            return send({embeds: [embed]})
-        } 
-        
-        if(queue){
-            if (queue.queue.length >= 1){
-                queue.queue.push(song)
-    
+            return send({embeds:[embed]})
+        }
+
+        if (Boolean(query) & Boolean(channel)){
+
+            const searchResults = await ytsearch(query);
+            const results = searchResults.videos;
+
+            const song = {
+                title: results[0]['title'],
+                thumbnail : results[0]['thumbnail'],
+                url : results[0]['url'],
+                id : results[0]['videoId'],
+                views : results[0]['views'],
+                duration : results[0]['timestamp'],
+                author : results[0]['author']
+            }
+
+            if (!queue){
+                const structure = {
+                    channel: message.channel,
+                    vc: channel,
+                    volume: 100,
+                    player : null,
+                    playing: true,
+                    queue: [],
+                    connection: null,
+                };
+
                 const embed = new MessageEmbed()
-                    .setColor('ORANGE')
-                    .setTitle(":hourglass_flowing_sand: Dans la file d'attente")
-                    .setImage(result[0]['thumbnail'])
+                    .setColor('#551A8B')
+                    .setTitle(':cd: Lecture en cours...')
+                    .setImage(song["thumbnail"])
                     .addFields(
                         { name: ':notes: Titre', value: song['title'] },
                         { name: ':alarm_clock: Durée', value: song['duration'] },
                         { name: ':eye: Nombre de vues', value: song['views'].toString()},
                         { name: ':pencil: Auteur', value: song['author']['name']},   
                     )
-             
-                return send({embeds: [embed]})
-            } else if (queue.queue.length == 0){
-                queue.queue.push(song)
-                const track = message.client.queue.get(message.guild.id);
 
-                const embed = new MessageEmbed()
-                .setColor('GREEN')
-                .setTitle(':cd: Lecture en cours...')
-                .setImage(result[0]['thumbnail'])
-                .addFields(
-                    { name: ':notes: Titre', value: song['title'] },
-                    { name: ':alarm_clock: Durée', value: song['duration'] },
-                    { name: ':eye: Nombre de vues', value: song['views'].toString()},
-                    { name: ':pencil: Auteur', value: song['author']['name']},   
-                )
+                setqueue(message.guild.id, structure);
+                structure.queue.push(song);
+                play(song)
 
-                play(track.queue[0])
-                return send({embeds: [embed]})
-            } else if (queue.queue.length >= 1 & !queue.playing & !args){
-                queue.player.unpause()
-                queue.playing = true
+                return send({embeds:[embed]})
             }
-        } 
 
-        function play(track){
-            const data =  message.client.queue.get(message.guild.id);
-            const source = ytdl(track.url,{
+            if (Boolean(queue)){
+                const Queue = message.client.queue.get(message.guild.id);
+                const embed = new MessageEmbed()
+                    .setColor('#00008B')
+                    .setTitle(":hourglass_flowing_sand: Dans la file d'attente")
+                    .setImage(song["thumbnail"])
+                    .addFields(
+                        { name: ':notes: Titre', value: song['title'] },
+                        { name: ':alarm_clock: Durée', value: song['duration'] },
+                        { name: ':eye: Nombre de vues', value: song['views'].toString()},
+                        { name: ':pencil: Auteur', value: song['author']['name']},   
+                    )
+
+                Queue.queue.push(song)
+
+                return send({embeds:[embed]})
+            }
+        }
+
+        function play(info){
+            const Queue = message.client.queue.get(message.guild.id);
+            const source = ytdl(info.url, {
                 filter: "audioonly",
                 quality: "highestaudio",
                 highWaterMark: 1 << 25,
             })
 
-            const resource = createAudioResource(source,{ inlineVolume:true })
+            const resource = createAudioResource(source,{ inlineVolume: true });
             resource.volume.setVolume(1)
-            const player = createAudioPlayer()
+            const player = createAudioPlayer();
 
             const connection = joinVoiceChannel({
                 channelId: channel.id,
@@ -135,24 +115,30 @@ module.exports = {
                 adapterCreator: message.guild.voiceAdapterCreator,
             });
 
-            data.player = player
-            data.connection = connection
             connection.subscribe(player);
             player.play(resource);
 
-            player.on('idle',()=>{
-                data.queue.shift()
-                const list = message.client.queue.get(message.guild.id);
+            Queue.player = player
+            Queue.connection = connection
 
-                if (list.queue.length == 0){
-                    setTimeout(()=>{
-                        player.stop()
-                        connection.destroy()   
-                    },30000) 
-                } else {
-                    play(list.queue[0])
-                }
+            player.on("idle", () => {
+                Queue.queue.shift()
+                let counter = 0;
+                let timer = setInterval(() => {
+                    if (counter == 30){
+                        player.stop();
+                        connection.destroy();
+                        clearInterval(timer);
+                    } else {
+                        const requeue = message.client.queue.get(message.guild.id);
+                        if (requeue.queue.length > 0){
+                            play(requeue.queue[0])
+                            clearInterval(timer)
+                        }
+                    }
+                    counter ++;
+                },1000);
             })
-        } 
+        }
     }
 }
