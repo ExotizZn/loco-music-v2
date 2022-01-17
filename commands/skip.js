@@ -7,76 +7,80 @@ module.exports = {
     aliases:['s'],
     voiceChannel: true,
 
-    async execute( client, message ) {
+    async execute( client, message , args) {
         const channel = message.member.voice.channel;
         const queue = message.client.queue.get(message.guild.id);
-
-        const error = (err) => message.channel.send(err);
-        const send = (content) => message.channel.send(content);
         
-        if(!queue){
-            const embed  = new MessageEmbed()
+        if ((!channel & !queue) || (!channel & Boolean(queue))){
+            const embed = new MessageEmbed()
                 .setColor("RED")
-                .setTitle("🔴 Pas de musique 🔴")
+                .setTitle("Erreur")
+                .setDescription("Tu n'es pas connecté à un salon vocal")
 
-            return error({embeds : [embed]})
-        }  
+            return send({embeds:[embed]})
+        }
 
-        if(queue){
-            const track = message.client.queue.get(message.guild.id);
-            if(track.queue.length == 1){
+        if(queue & Boolean(channel)){
+            const Queue = message.client.queue.get(message.guild.id);
+
+            if (Queue.queue.length == 1){
                 const embed = new MessageEmbed()
-                    .setColor('RED')
-                    .setTitle("🔴 Pas de musique dans la file d'attente 🔴")
-
-                return error({embeds:[embed]})
-            } else if(queue.queue.length > 1){
-                queue.queue.shift()
-                const track = message.client.queue.get(message.guild.id);
-
-                const embed = new MessageEmbed()
-                    .setColor('GREEN')
-                    .setTitle(':cd: Lecture en cours...')
-                    .setImage(track.queue[0]['thumbnail'])
-                    .addFields(
-                        { name: ':notes: Titre', value: track.queue[0]['title'] },
-                        { name: ':alarm_clock: Durée', value:  track.queue[0]['duration'] },
-                        { name: ':eye: Nombre de vues', value:  track.queue[0]['views'].toString()},
-                        { name: ':pencil: Auteur', value:  track.queue[0]['author']['name']},   
-                    )
-
-                play(track.queue[0])
+                    .setColor("RED")
+                    .setTitle("Erreur")
+                    .setDescription("Pas de musique dans la file d'attente")
 
                 return send({embeds:[embed]})
             }
+             
+            if (Queue.queue.length > 1){
+                Queue.queue.shift()
+                const reQueue = message.client.queue.get(message.guild.id);
+                play(reQueue[0])
+            }
         }
 
-        function play(track){
-            const data =  message.client.queue.get(message.guild.id);
-            const source = ytdl(track.url,{
+        function play(info){
+            const Queue = message.client.queue.get(message.guild.id);
+            const source = ytdl(info.url, {
                 filter: "audioonly",
                 quality: "highestaudio",
                 highWaterMark: 1 << 25,
             })
 
-            const resource = createAudioResource(source,{ inlineVolume:true })
+            const resource = createAudioResource(source,{ inlineVolume: true });
             resource.volume.setVolume(1)
+            const player = createAudioPlayer();
 
-            queue.player.play(resource);
-            queue.player.on('idle',()=>{
-                queue.queue.shift()
-                const list = message.client.queue.get(message.guild.id);
+            const connection = joinVoiceChannel({
+                channelId: channel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator,
+            });
 
-                if (list.queue.length == 0){
-                    setTimeout(()=>{
-                        queue.player.stop()
-                        queue.connection.destroy()   
-                    },30000) 
-                } else {
-                    play(list.queue[0])
-                }
+            connection.subscribe(player);
+            player.play(resource);
+
+            Queue.player = player
+            Queue.connection = connection
+
+            player.on("idle", () => {
+                Queue.queue.shift()
+                let counter = 0;
+                let timer = setInterval(() => {
+                    if (counter == 30){
+                        player.stop();
+                        connection.destroy();
+                        clearInterval(timer);
+                    } else {
+                        const requeue = message.client.queue.get(message.guild.id);
+                        if (requeue.queue.length > 0){
+                            play(requeue.queue[0])
+                            clearInterval(timer)
+                        }
+                    }
+                    counter ++;
+                },1000);
             })
-            
-        } 
+        }
     }
 }
