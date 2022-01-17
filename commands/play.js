@@ -13,8 +13,16 @@ module.exports = {
         const channel = message.member.voice.channel;
         const setqueue = (id, obj) => message.client.queue.set(id, obj);
         const queue = message.client.queue.get(message.guild.id);
-        const query = args.join(" ");
+        let query = args.join(" ");
         const send = (content) => message.channel.send(content);
+
+        if (Boolean(query)){
+            if (query.includes("&t=")){
+                let find = query.search("&t=");
+                query = query.slice(0,find);
+            }
+        }
+            
 
         if ((!channel & !query) || (!channel & Boolean(query))){
             const embed = new MessageEmbed()
